@@ -1053,24 +1053,27 @@ void DISOpticalFlowImpl::Densification_ParBody::operator()(const Range &range) c
             float sum_Uy = 0.0f;
 
             /* Iterate through all the patches that overlap the current location (i,j) */
-            for (int is = start_is; is <= end_is; is++)
-                for (int js = start_js; js <= end_js; js++)
-                {
-                    j_m = min(max(j + Sx_ptr[is * dis->ws + js], 0.0f), dis->w - 1.0f - EPS);
-                    i_m = min(max(i + Sy_ptr[is * dis->ws + js], 0.0f), dis->h - 1.0f - EPS);
-                    j_l = (int)j_m;
-                    j_u = j_l + 1;
-                    i_l = (int)i_m;
-                    i_u = i_l + 1;
-                    diff = (j_m - j_l) * (i_m - i_l) * I1_ptr[i_u * dis->w + j_u] +
-                           (j_u - j_m) * (i_m - i_l) * I1_ptr[i_u * dis->w + j_l] +
-                           (j_m - j_l) * (i_u - i_m) * I1_ptr[i_l * dis->w + j_u] +
-                           (j_u - j_m) * (i_u - i_m) * I1_ptr[i_l * dis->w + j_l] - I0_ptr[i * dis->w + j];
-                    coef = 1 / max(1.0f, abs(diff));
-                    sum_Ux += coef * Sx_ptr[is * dis->ws + js];
-                    sum_Uy += coef * Sy_ptr[is * dis->ws + js];
-                    sum_coef += coef;
+            int tile = 8;
+            for (int iis = start_is; iis <= end_is; iis += tile) {
+                for (int js = start_js; js <= end_js; js++) {
+                    for (int is = start_is; is <= min(end_is, iis); is++) {
+                        j_m = min(max(j + Sx_ptr[is * dis->ws + js], 0.0f), dis->w - 1.0f - EPS);
+                        i_m = min(max(i + Sy_ptr[is * dis->ws + js], 0.0f), dis->h - 1.0f - EPS);
+                        j_l = (int)j_m;
+                        j_u = j_l + 1;
+                        i_l = (int)i_m;
+                        i_u = i_l + 1;
+                        diff = (j_m - j_l) * (i_m - i_l) * I1_ptr[i_u * dis->w + j_u] +
+                               (j_u - j_m) * (i_m - i_l) * I1_ptr[i_u * dis->w + j_l] +
+                               (j_m - j_l) * (i_u - i_m) * I1_ptr[i_l * dis->w + j_u] +
+                               (j_u - j_m) * (i_u - i_m) * I1_ptr[i_l * dis->w + j_l] - I0_ptr[i * dis->w + j];
+                        coef = 1 / max(1.0f, abs(diff));
+                        sum_Ux += coef * Sx_ptr[is * dis->ws + js];
+                        sum_Uy += coef * Sy_ptr[is * dis->ws + js];
+                        sum_coef += coef;
+                    }
                 }
+            }
             CV_DbgAssert(sum_coef != 0);
             Ux_ptr[i * dis->w + j] = sum_Ux / sum_coef;
             Uy_ptr[i * dis->w + j] = sum_Uy / sum_coef;
